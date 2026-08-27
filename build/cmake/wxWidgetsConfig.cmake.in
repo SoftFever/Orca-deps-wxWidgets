@@ -58,7 +58,27 @@ if(WIN32_MSVC_NAMING)
     endif()
 endif()
 
-include("${CMAKE_CURRENT_LIST_DIR}${wxPLATFORM_LIB_DIR}/@PROJECT_NAME@Targets.cmake")
+# wxPLATFORM_LIB_DIR is derived from the consuming compiler, but the installed
+# layout depends on the compiler that built wxWidgets: cl installs into
+# vc_<arch>_lib, clang-cl into clang_<arch>_lib. Try the derived path, then the
+# same layout under the other compiler prefix - never a glob, whose first match
+# would depend on sort order.
+set(wxTARGETS_FILE "${CMAKE_CURRENT_LIST_DIR}${wxPLATFORM_LIB_DIR}/@PROJECT_NAME@Targets.cmake")
+if(NOT EXISTS "${wxTARGETS_FILE}")
+    if(wxPLATFORM_LIB_DIR MATCHES "^/clang")
+        string(REGEX REPLACE "^/clang" "/vc" wxPLATFORM_LIB_DIR_ALT "${wxPLATFORM_LIB_DIR}")
+    elseif(wxPLATFORM_LIB_DIR MATCHES "^/vc")
+        string(REGEX REPLACE "^/vc" "/clang" wxPLATFORM_LIB_DIR_ALT "${wxPLATFORM_LIB_DIR}")
+    endif()
+    if(wxPLATFORM_LIB_DIR_ALT AND EXISTS "${CMAKE_CURRENT_LIST_DIR}${wxPLATFORM_LIB_DIR_ALT}/@PROJECT_NAME@Targets.cmake")
+        # Later uses of wxPLATFORM_LIB_DIR, the setup.h include dir among them,
+        # have to follow the layout that actually exists.
+        set(wxPLATFORM_LIB_DIR "${wxPLATFORM_LIB_DIR_ALT}")
+        set(wxTARGETS_FILE "${CMAKE_CURRENT_LIST_DIR}${wxPLATFORM_LIB_DIR}/@PROJECT_NAME@Targets.cmake")
+    endif()
+    unset(wxPLATFORM_LIB_DIR_ALT)
+endif()
+include("${wxTARGETS_FILE}")
 
 macro(wx_inherit_property source dest name)
     # property name without _<CONFIG>
